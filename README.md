@@ -25,6 +25,3 @@ Provides admin endpoints to create competitions and a public UI that displays co
    - Build and run:
      - `dotnet run`
 4. Open browser at `http://localhost:5232`
-
-## License
-MIT License. See LICENSE file.
