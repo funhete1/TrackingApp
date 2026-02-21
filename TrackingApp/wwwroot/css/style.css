@@ -1,0 +1,49 @@
+﻿/* 1. Global Reset & Typography */
+body, html {
+    margin: 0;
+    padding: 0;
+    height: 100%;
+    font-family: 'Inter', sans-serif;
+    background-color: #f8f9fa; /* Light grey background for a modern feel */
+}
+
+/* 2. Map Styles */
+#map {
+    height: 600px; /* Increased for better visibility */
+    width: 100%;
+    z-index: 1; /* Keeps map below navbars/modals */
+    cursor: crosshair; /* Changes cursor to let user know they should click */
+}
+
+/* 3. Stats Card (The floating distance display) */
+#stats-card {
+    transition: all 0.3s ease;
+    pointer-events: none; /* Let clicks "pass through" to the map */
+    z-index: 1000;
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(4px); /* Modern frosted glass effect */
+}
+
+/* 4. Cleaning up Leaflet Plugin UI */
+.leaflet-routing-container {
+    display: none !important; /* Hides the text directions box */
+}
+
+/* 5. Utility Classes */
+.rounded-4 {
+    border-radius: 1rem !important;
+}
+
+.extra-small {
+    font-size: 0.7rem;
+}
+
+.z-3 {
+    z-index: 1000 !important;
+}
+
+/* Navbar polish */
+.navbar {
+    letter-spacing: 0.5px;
+    padding: 0.8rem 1rem;
+}
