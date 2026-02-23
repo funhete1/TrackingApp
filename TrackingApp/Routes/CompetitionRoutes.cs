@@ -66,7 +66,8 @@ namespace TrackingApp.Routes
                                     EndLon = c.End.Lng
                                 })
                                 .ToListAsync();
-
+                
+                Console.Write(BegEnd);
 
                 var runners = await db.Competidores
                                     .Where(c => c.CompetId == compId)
@@ -76,6 +77,7 @@ namespace TrackingApp.Routes
                                         Lng = c.pos.Lng
                                     })
                                     .ToListAsync();
+
                 if (BegEnd == null) {
                     return Results.BadRequest("Failed to load the compettion data");
                 }
@@ -84,7 +86,7 @@ namespace TrackingApp.Routes
                 {
                     return Results.BadRequest("No runners registed in this run");
                 }
-                
+                //runners.Sort(Position.GetDistance());
                 return Results.Ok(new {BegEnd,runners});
             });
 
@@ -297,6 +299,21 @@ namespace TrackingApp.Routes
                 }
                 return Results.BadRequest(result.Errors);
             });
+            group.MapGet("/roles", async (ClaimsPrincipal user, UserManager<ApplicationUser> userManager) =>
+            {
+                // Check if the user is logged in
+                if (user.Identity?.IsAuthenticated != true)
+                    return Results.Unauthorized();
+
+                var userEntity = await userManager.GetUserAsync(user);
+                if (userEntity == null)
+                    return Results.NotFound("User no longer exists.");
+
+                // Get the roles from the AspNetUserRoles table
+                var roles = await userManager.GetRolesAsync(userEntity);
+
+                return Results.Ok(roles);
+            }).RequireAuthorization();
 
             // 2. Map the rest (Login, etc.)
             group.MapIdentityApi<ApplicationUser>();

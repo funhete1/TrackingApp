@@ -59,19 +59,22 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ email, password })
                 });
+                console.log(response);
                 if (response.ok) {
                     const data = await response.json();
                     localStorage.setItem("token", data.accessToken);
 
-                    // Extract role FROM the token instead of data.role
-                    const role = getRoleFromToken(data.accessToken);
-                    localStorage.setItem("userRole", role);
+                    const rolesRes = await fetch('/identity/roles', {
+                        headers: { 'Authorization': `Bearer ${data.accessToken}` }
+                    });
 
+                    const roles = await rolesRes.json();
+
+                    const primaryRole = roles.includes("Admin") ? "Admin" : "User";
+                    localStorage.setItem("userRole", primaryRole);
+
+                    // NOW go to the home page
                     window.location.href = '/';
-                } else {
-                    const errorData = await response.json();
-                    const errorMsg = errorData.error || "Erro ao fazer login.";
-                    alert(errorMsg);
                 }
             } catch (error) {
                 alert("Erro de conexão com o servidor.");

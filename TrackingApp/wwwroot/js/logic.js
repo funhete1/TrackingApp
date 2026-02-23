@@ -7,6 +7,10 @@
     let routingControl = null;
     let runnerMarkers = [];
 
+    // -- Auth UI logic 
+    const token = localStorage.getItem("token");
+    const userRole = localStorage.getItem("userRole");
+
     // --- UI elements ---
     const competitionSelect = document.getElementById('competition-select');
     const runnersContainer = document.getElementById('runners-container');
@@ -15,6 +19,42 @@
     const viewPathBtn = document.getElementById('view-path-btn');
     const refreshBtn = document.getElementById('refresh-runners');
     const clearMapBtn = document.getElementById('clear-map');
+    const adminPanelBtn = document.getElementById('admin-panel-btn');
+    const loginLink = document.getElementById('login-link');
+    const logoutBtn = document.getElementById('logout-btn');
+
+    // Auth logic
+    if (token) {
+        // User is logged in
+        if (loginLink) loginLink.classList.add('d-none'); // Hide Sign In
+        if (logoutBtn) logoutBtn.classList.remove('d-none'); // Show Logout
+
+        // Check if user is Admin
+        if (userRole === "Admin") {
+            if (adminPanelBtn) adminPanelBtn.classList.remove('d-none'); // Show Admin Panel
+        }
+    } else {
+        // User is NOT logged in
+        if (loginLink) loginLink.classList.remove('d-none'); // Show Sign In
+        if (logoutBtn) logoutBtn.classList.add('d-none'); // Hide Logout
+        if (adminPanelBtn) adminPanelBtn.classList.add('d-none'); // Hide Admin Panel
+    }
+
+    // --- Logout Logic ---
+    if (logoutBtn) {
+        logoutBtn.addEventListener('click', () => {
+            localStorage.removeItem("token");
+            localStorage.removeItem("userRole");
+            window.location.reload();
+        });
+    }
+
+    // --- Admin Panel Redirection ---
+    if (adminPanelBtn) {
+        adminPanelBtn.addEventListener('click', () => {
+            window.location.href = './html/AdminDashboard.html';
+        });
+    }
 
     // --- Helpers ---
     function escapeHtml(s) {
