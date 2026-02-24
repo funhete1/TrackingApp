@@ -55,8 +55,38 @@
             window.location.href = './html/AdminDashboard.html';
         });
     }
-    
-    // --- Helpers ---
+
+
+    // Event listner for the runner name click (event delegation)
+    runnersTableBody.addEventListener('click', (e) => {
+        const target = e.target;
+        if (target && target.id === 'selected_runner') {
+            const runnerName = target.textContent;
+            const runnerData = Allrunners.find(r => r.name === runnerName);
+            if (runnerData) {
+                const runnerLatLng = L.latLng(Number(runnerData.lat), Number(runnerData.lng));
+
+                // prefer full route geometry if available
+                const routeLatLngs = (window.currentRouteLatLngs && window.currentRouteLatLngs.length)
+                    ? window.currentRouteLatLngs
+                    : (routingControl ? routingControl.getPlan().getWaypoints().map(w => w.latLng) : []);
+
+                if (routeLatLngs.length) {
+                    const nearestPoint = findNearestPointOnRoute(runnerLatLng, routeLatLngs, map);
+                    const marker = L.marker(nearestPoint).addTo(map).bindPopup(`${escapeHtml(runnerName)}<br>Distance to route: ${runnerLatLng.distanceTo(nearestPoint).toFixed(1)} m`).openPopup();
+                    runnerMarkers.push(marker);
+                    map.setView(nearestPoint, 14);
+                } else {
+                    // fallback: show runner location
+                    const marker = L.marker(runnerLatLng).addTo(map).bindPopup(`${escapeHtml(runnerName)}<br>(No route data)`).openPopup();
+                    runnerMarkers.push(marker);
+                    map.setView(runnerLatLng, 14);
+                }
+            }
+        }
+    });
+
+// --- Helpers ---
 
     // Helpers Variables
     let Allrunners = [];
@@ -91,13 +121,12 @@
             return;
         }
 
-        // 1. Calculate the slice for the current page
         const start = (currentPage - 1) * rowsPerPage;
         const end = start + rowsPerPage;
         runnersName = Allrunners.map(r => r.name);
         const paginatedItems = runnersName.slice(start, end);
 
-        // 2. Render only the items in this slice
+        
         paginatedItems.forEach((name, idx) => {
             const tr = document.createElement('tr');
             // Calculate global ID based on page index
@@ -105,16 +134,16 @@
 
             tr.innerHTML = `
             <th scope="row" class="text-center">${globalId}</th>
-            <td class="text-center">${escapeHtml(name)}</td>`;
+            <td id="selected_runner" class="text-center">${name}</td>`;
             runnersTableBody.appendChild(tr);
         });
 
-        // 3. Update UI Visibility
+       
         runnersEmpty.style.display = 'none';
         runnersContainer.style.display = 'block';
         document.getElementById('runners-pagination').style.display = 'block';
 
-        // 4. Update Pagination Controls
+
         updatePaginationUI();
     }
     function updatePaginationUI() {
@@ -131,7 +160,7 @@
     }
 
     // --- Event Listeners for Pagination Buttons ---
-    document.getElementById('prev-page').addEventListener('click', (e) => {
+    document.getElementById('prev-page').addEventListener('click', (e) => { 
         e.preventDefault();
         if (currentPage > 1) renderRunners(currentPage - 1);
     });
@@ -146,7 +175,6 @@
     function showRouteFromPoints(startLatLng, endLatLng) {
         clearRoute();
 
-        // 1. Define custom icons
         const startIcon = L.icon({
             iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-green.png',
             shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
@@ -190,16 +218,40 @@
             }
         }).addTo(map);
 
-        // ... (rest of your routingControl.on('routesfound') and setTimeout logic)
+       
         routingControl.on('routesfound', function (e) {
-            const summary = e.routes[0].summary;
-            const distanceKm = (summary.totalDistance / 1000).toFixed(2);
-            const statsCard = document.getElementById('stats-card');
-            const distanceVal = document.getElementById('distance-val');
-            if (statsCard && distanceVal) {
-                statsCard.style.display = 'block';
-                distanceVal.innerText = distanceKm;
+            const route = e.routes && e.routes[0];
+            let routeCoords = [];
+
+            
+            if (route) {
+                // route.coordinates sometimes contains [{lat, lng}] or [lng,lat] arrays
+                if (Array.isArray(route.coordinates) && route.coordinates.length) {
+                    routeCoords = route.coordinates.map(p => {
+                        if (p instanceof L.LatLng) return p;
+                        if (Array.isArray(p) && p.length >= 2) {
+                            // try detect [lon, lat] or [lat, lon]
+                            const a = Number(p[0]), b = Number(p[1]);
+                            return Math.abs(a) > 90 ? L.latLng(b, a) : L.latLng(a, b);
+                        }
+                        if (p.lat != null && p.lng != null) return L.latLng(p.lat, p.lng);
+                        return null;
+                    }).filter(Boolean);
+                }
+
+                
+                if (routeCoords.length === 0 && typeof route.geometry === 'string' && window.polyline && typeof window.polyline.decode === 'function') {
+                    const decoded = window.polyline.decode(route.geometry); 
+                    routeCoords = decoded.map(p => L.latLng(p[0], p[1]));
+                }
             }
+
+            if (routeCoords.length === 0 && routingControl._line && typeof routingControl._line.getLatLngs === 'function') {
+                routeCoords = routingControl._line.getLatLngs();
+            }
+
+            
+            window.currentRouteLatLngs = routeCoords;
         });
 
         setTimeout(() => {
@@ -257,7 +309,8 @@
             }
 
             const data = await res.json();
-      
+
+            console.log(data);
             if (data == null) {
                 runnersEmpty.textContent = 'No data returned.';
                 runnersEmpty.style.display = 'block';
@@ -267,15 +320,17 @@
             }
 
             let beg = null, end = null;
-            const be = data.begEnd[0];
+            const be = data.begEnd;
             if (be) {
                 beg = { lat: be.beginningLat, lng: be.beginningLon };
                 end = { lat: be.endLat, lng: be.endLon };
             }
 
+            console.log(be);
+
            
            
-            const rawRunners = data.runners;
+            const rawRunners = data.sortedRunners;
             Allrunners = rawRunners.map(r => {
                 const name = r.name;
                 const point = { lat: r.lat, lng: r.lng };
@@ -295,7 +350,7 @@
             renderRunners(1);
 
         } catch (err) {
-            console.error('Error loading competition data', err);
+            console.error('Error    loading competition data', err);
             runnersEmpty.textContent = 'Error loading data (see console).';
             runnersEmpty.style.display = 'block';
             runnersContainer.style.display = 'none';
@@ -346,33 +401,35 @@
         });
     }
 
+    // --- Inside your DOMContentLoaded block ---
+
+    function findNearestPointOnRoute(runnerLatLng, routeLatLngs, mapInstance) {
+        let minDistance = Infinity;
+        let closestPoint = routeLatLngs[0];
+
+        for (let i = 0; i < routeLatLngs.length - 1; i++) {
+            const p1 = routeLatLngs[i];
+            const p2 = routeLatLngs[i + 1];
+
+            // Convert LatLng to Pixel points to use LineUtil
+            const pRunner = mapInstance.latLngToLayerPoint(runnerLatLng);
+            const pLine1 = mapInstance.latLngToLayerPoint(p1);
+            const pLine2 = mapInstance.latLngToLayerPoint(p2);
+
+            const closestOnSegment = L.LineUtil.closestPointOnSegment(pRunner, pLine1, pLine2);
+
+            // Convert back to LatLng
+            const snappedLatLng = mapInstance.layerPointToLatLng(closestOnSegment);
+            const distance = runnerLatLng.distanceTo(snappedLatLng);
+
+            if (distance < minDistance) {
+                minDistance = distance;
+                closestPoint = snappedLatLng;
+            }
+        }
+        return closestPoint;
+    }
+
     // initial load
     await loadPublicCompetitions();
 });
-
-// Helper function to find the closest point on the route polyline
-function findNearestPointOnRoute(runnerLatLng, routeLatLngs) {
-    let minDistance = Infinity;
-    let closestPoint = runnerLatLng;
-
-    for (let i = 0; i < routeLatLngs.length - 1; i++) {
-        const p1 = routeLatLngs[i];
-        const p2 = routeLatLngs[i + 1];
-
-        // Leaflet helper to find the closest point on a line segment (p1-p2)
-        const closestOnSegment = L.LineUtil.closestPointOnSegment(
-            map.latLngToLayerPoint(runnerLatLng),
-            map.latLngToLayerPoint(p1),
-            map.latLngToLayerPoint(p2)
-        );
-
-        const snappedLatLng = map.layerPointToLatLng(closestOnSegment);
-        const distance = runnerLatLng.distanceTo(snappedLatLng);
-
-        if (distance < minDistance) {
-            minDistance = distance;
-            closestPoint = snappedLatLng;
-        }
-    }
-    return closestPoint;
-}

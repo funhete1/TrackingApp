@@ -1,4 +1,5 @@
 ﻿using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Mvc.Diagnostics;
 using Microsoft.EntityFrameworkCore;
 using System.Security.Claims;
 using TrackingApp.Data;
@@ -17,6 +18,7 @@ namespace TrackingApp.Routes
             var group = routes.MapGroup("/api/public");
 
             // Implement latter
+            // Designed to Run the simlation using SignalR instead of static data being randomized to the database
             //    group.MapPost("/iniciar/{id}", async (int id, GestorCorrida gestor, AppDbContext db) =>
             //    {
             //        // Busca os dados da corrida no banco de dados
@@ -65,7 +67,7 @@ namespace TrackingApp.Routes
                                     EndLat = c.End.Lat,
                                     EndLon = c.End.Lng
                                 })
-                                .ToListAsync();
+                                .FirstOrDefaultAsync();
                 
                 
 
@@ -86,8 +88,13 @@ namespace TrackingApp.Routes
                 {
                     return Results.BadRequest("No runners registed in this run");
                 }
-                //runners.Sort(Position.GetDistance());
-                return Results.Ok(new {BegEnd,runners});
+                var sortedRunners = runners
+                     .OrderBy(r => Position.GetDistance(
+                         new Position { Lat = BegEnd.EndLat, Lng = BegEnd.EndLon},
+                         new Position { Lat = r.Lat, Lng = r.Lng }
+                     ))
+                     .ToList();
+                return Results.Ok(new {BegEnd,sortedRunners});
             });
 
         }
@@ -203,9 +210,7 @@ namespace TrackingApp.Routes
                         //DB context for background work
                         using var scope = serviceProvider.CreateScope();
                         var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-                        Console.WriteLine($"CompID:{compId}");
-                        Console.WriteLine($"Competiton:{competition.Id}");
-
+        
 
                         //Delay so dont happen race conditions
                         var exists = await context.Competitions.AnyAsync(c => c.Id == competition.Id);
@@ -231,8 +236,7 @@ namespace TrackingApp.Routes
                             // Pick a coordinate from the path
                             var basePoint = routePoints[random.Next(routePoints.Count)];
 
-                            // Apply Jitter (random position relative to the path)
-                            // 0.0001 roughly equals 11 meters
+                            //Offset to add some randomness (up to ~15m in any direction)
                             double latOffset = (random.NextDouble() * 2 - 1) * 0.00015;
                             double lngOffset = (random.NextDouble() * 2 - 1) * 0.00015;
 
