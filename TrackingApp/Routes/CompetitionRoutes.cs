@@ -67,7 +67,7 @@ namespace TrackingApp.Routes
                                 })
                                 .ToListAsync();
                 
-                Console.Write(BegEnd);
+                
 
                 var runners = await db.Competidores
                                     .Where(c => c.CompetId == compId)

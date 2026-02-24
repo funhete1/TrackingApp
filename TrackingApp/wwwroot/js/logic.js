@@ -55,8 +55,15 @@
             window.location.href = './html/AdminDashboard.html';
         });
     }
-
+    
     // --- Helpers ---
+
+    // Helpers Variables
+    let Allrunners = [];
+    let currentPage = 1;
+    const rowsPerPage = 15;
+
+
     function escapeHtml(s) {
         return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
     }
@@ -72,30 +79,68 @@
         if (statsCard) statsCard.style.display = 'none';
     }
 
-    function renderRunners(runners) {
+    function renderRunners(page) {
+        currentPage = page;
         runnersTableBody.innerHTML = '';
-        if (!Array.isArray(runners) || runners.length === 0) {
+
+        if (!Allrunners || Allrunners.length === 0) {
             runnersContainer.style.display = 'none';
             runnersEmpty.style.display = 'block';
             runnersEmpty.textContent = 'No runners found for this competition.';
+            document.getElementById('runners-pagination').style.display = 'none';
             return;
         }
 
-        runners.forEach((nome, idx) => {
-            const name = nome;
-            const tr = document.createElement('tr');
+        // 1. Calculate the slice for the current page
+        const start = (currentPage - 1) * rowsPerPage;
+        const end = start + rowsPerPage;
+        runnersName = Allrunners.map(r => r.name);
+        const paginatedItems = runnersName.slice(start, end);
 
-            // Both cells now have text-center to align with the header
+        // 2. Render only the items in this slice
+        paginatedItems.forEach((name, idx) => {
+            const tr = document.createElement('tr');
+            // Calculate global ID based on page index
+            const globalId = start + idx + 1;
+
             tr.innerHTML = `
-                <th scope="row" class="text-center">${idx + 1}</th>
-                <td class="text-center">${escapeHtml(name)}</td>`;
+            <th scope="row" class="text-center">${globalId}</th>
+            <td class="text-center">${escapeHtml(name)}</td>`;
             runnersTableBody.appendChild(tr);
         });
-      
 
+        // 3. Update UI Visibility
         runnersEmpty.style.display = 'none';
         runnersContainer.style.display = 'block';
+        document.getElementById('runners-pagination').style.display = 'block';
+
+        // 4. Update Pagination Controls
+        updatePaginationUI();
     }
+    function updatePaginationUI() {
+        const totalPages = Math.ceil(Allrunners.length / rowsPerPage);
+        const infoLabel = document.getElementById('current-page-info');
+        const prevBtn = document.getElementById('prev-page');
+        const nextBtn = document.getElementById('next-page');
+
+        infoLabel.textContent = `Page ${currentPage} of ${totalPages}`;
+
+        // Disable buttons if at boundaries
+        prevBtn.classList.toggle('disabled', currentPage === 1);
+        nextBtn.classList.toggle('disabled', currentPage === totalPages || totalPages === 0);
+    }
+
+    // --- Event Listeners for Pagination Buttons ---
+    document.getElementById('prev-page').addEventListener('click', (e) => {
+        e.preventDefault();
+        if (currentPage > 1) renderRunners(currentPage - 1);
+    });
+
+    document.getElementById('next-page').addEventListener('click', (e) => {
+        e.preventDefault();
+        const totalPages = Math.ceil(Allrunners.length / rowsPerPage);
+        if (currentPage < totalPages) renderRunners(currentPage + 1);
+    });
 
     // Build and display a route on the map from two positions
     function showRouteFromPoints(startLatLng, endLatLng) {
@@ -229,13 +274,15 @@
             }
 
            
-            let runners = [];
+           
             const rawRunners = data.runners;
-            runners = rawRunners.map(r => {
+            Allrunners = rawRunners.map(r => {
                 const name = r.name;
                 const point = { lat: r.lat, lng: r.lng };
                 return { ...r, name, lat: point.lat, lng: point.lng };
             });
+
+            
 
             // Show route if we have valid coordinates
             if (beg && end) {
@@ -245,7 +292,8 @@
                 console.error("Coordinate data missing or invalid:", data.BegEnd, data.beginning, data.end);
                 clearRoute();
             }
-            renderRunners(runners.map(r => r.name));
+            renderRunners(1);
+
         } catch (err) {
             console.error('Error loading competition data', err);
             runnersEmpty.textContent = 'Error loading data (see console).';
